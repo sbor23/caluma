@@ -1,6 +1,5 @@
 """Hierarchical representation of a document / form."""
 import weakref
-from functools import singledispatch
 from typing import List, Optional
 
 from .models import AnswerDocument, Question
@@ -228,25 +227,35 @@ class FieldSet(Element):
         return f"<FieldSet form={self.form.slug}, doc={self.document.pk}>"
 
 
-def print_document_structure(document):  # pragma: no cover
+class Visitor:
+    def visit(self, node):
+        method = f"visit_{type(node).__name__}"
+        visitor = getattr(self, method, self.generic_visit)
+        return visitor(node)
+
+    def generic_visit(self, node):
+        for child in node.children():
+            self.visit(child)
+
+
+class PrintingVisitor(Visitor):
     """Print a document's structure.
 
-    Intended halfway as an example on how to use the structure
-    classes, and a debugging utility.
+    Intended halfway as an example on how to use the structure classes, and a
+    debugging utility.
     """
-    ind = {"i": 0}
 
-    @singledispatch
-    def visit(vis):
-        raise Exception(f"generic visit(): {vis}")
+    def __init__(self, initial=0):
+        self.indentation = initial
 
-    @visit.register(Element)
-    def _(vis):
-        print("   " * ind["i"], vis)
-        ind["i"] += 1
-        for c in vis.children():
-            visit(c)
-        ind["i"] -= 1
+    def generic_visit(self, element):
+        print("   " * self.indentation, element)
+        self.indentation += 1
+        for child in element.children():
+            self.visit(child)
+        self.indentation -= 1
 
+
+def print_document_structure(document):  # pragma: no cover
     struc = FieldSet(document, document.form)
-    visit(struc)
+    PrintingVisitor().visit(struc)
